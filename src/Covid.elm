@@ -4,26 +4,23 @@ import Browser
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Http
-import Json.Decode as Decode exposing (Decoder, int, list, string, field, at)
+import Json.Decode as Decode exposing (int, list, string)
 import Json.Decode.Pipeline exposing (required)
 
 
 --MODELO
-type alias Summary =
-    { country : String
-    , countryCode : String
-    , slug : String
-    , newConfirmed: Int
-    , totalConfirmed: Int
-    , newDeaths: Int
-    , totalDeath: Int
-    , newRecovered: Int
-    , totalRecovered: Int
+type alias Continent =
+    { name : String
+    , population : Int
+    , totalCases: Int
+    , active: Int
+    , recovered: Int
+    , deaths: Int
     }
 
 
 type alias Model =
-    { summaries : List Summary
+    { continents : List Continent
     , errorMessage : Maybe String
     }
 
@@ -34,18 +31,18 @@ view model =
     div []
         [ button [ onClick SendHttpRequest ]
             [ text "Get data from server" ]
-        , viewSummaryOrError model
+        , viewContinentOrError model  
         ]
 
 
-viewSummaryOrError : Model -> Html Msg
-viewSummaryOrError model =
+viewContinentOrError : Model -> Html Msg
+viewContinentOrError model =
     case model.errorMessage of
         Just message ->
             viewError message
 
         Nothing ->
-            viewSummaries model.summaries
+            viewContinents model.continents
 
 
 viewError : String -> Html Msg
@@ -60,12 +57,12 @@ viewError errorMessage =
         ]
 
 
-viewSummaries : List Summary -> Html Msg
-viewSummaries summaries =
+viewContinents : List Continent -> Html Msg
+viewContinents continents =
     div []
-        [ h3 [] [ text "Summaries" ]
+        [ h3 [] [ text "Continents" ]
         , table []
-            ([ viewTableHeader ] ++ List.map viewSummary summaries)
+            ([ viewTableHeader ] ++ List.map viewContinent continents)
         ]
 
 
@@ -73,77 +70,62 @@ viewTableHeader : Html Msg
 viewTableHeader =
     tr []
         [ th []
-            [ text "Country" ]
+            [ text "Continente" ]
         , th []
-            [ text "Country code" ]
+            [ text "Población" ]
         , th []
-            [ text "Slug" ]
+            [ text "Casos totales" ]
         , th []
-            [ text "New confirmed" ]
+            [ text "Casos activos" ]
         , th []
-            [ text "Total confirmed" ]
+            [ text "Casos recuperados" ]
         , th []
-            [ text "New deaths" ]
-        , th []
-            [ text "Total deaths" ]
-        , th []
-            [ text "New recovered" ]
-        , th []
-            [ text "Total recovered" ]
+            [ text "Muertes" ]
         ]
 
 
-viewSummary : Summary -> Html Msg
-viewSummary summary =
+viewContinent : Continent -> Html Msg
+viewContinent continent =
     tr []
         [ td []
-            [ text summary.country ]
+            [ text continent.name ]
         , td []
-            [ text summary.countryCode ]
+            [ text (String.fromInt continent.population) ]
         , td []
-            [ text summary.slug ]
+            [ text (String.fromInt continent.totalCases) ]
         , td []
-            [ text (String.fromInt summary.newConfirmed) ]
+            [ text (String.fromInt continent.active) ]
         , td []
-            [ text (String.fromInt summary.totalConfirmed) ]
+            [ text (String.fromInt continent.recovered) ]
         , td []
-            [ text (String.fromInt summary.newDeaths) ]
-        , td []
-            [ text (String.fromInt summary.totalDeath) ]
-        , td []
-            [ text (String.fromInt summary.newRecovered) ]
-        , td []
-            [ text (String.fromInt summary.totalRecovered) ]
+            [ text (String.fromInt continent.deaths) ]
         ]
 
 
 --ACTUALIZAR
 type Msg
     = SendHttpRequest
-    | DataReceived (Result Http.Error (List Summary))
+    | DataReceived (Result Http.Error (List Continent))
 
 
-summaryDecoder : Decode.Decoder (List Summary)
-summaryDecoder = 
-    Decode.field "Countries" (Decode.list (Decode.succeed Summary
-        |> required "Country" string
-        |> required "CountryCode" string
-        |> required "Slug" string
-        |> required "NewConfirmed" int
-        |> required "TotalConfirmed" int
-        |> required "NewDeaths" int
-        |> required "TotalDeaths" int
-        |> required "NewRecovered" int
-        |> required "TotalRecovered" int))
+jsonDecoder : Decode.Decoder (List Continent)
+jsonDecoder = 
+    Decode.list (Decode.succeed Continent
+        |> required "continent" string
+        |> required "population" int
+        |> required "cases" int
+        |> required "active" int
+        |> required "recovered" int
+        |> required "deaths" int)
     
 
 getDatos : Cmd Msg
 getDatos =
     Http.get
-        { url = "https://api.covid19api.com/summary"
-        , expect = Http.expectJson DataReceived summaryDecoder
+        { url = "https://corona.lmao.ninja/v2/continents?yesterday=true&sort"
+        , expect = Http.expectJson DataReceived jsonDecoder
         }
-
+    
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -151,9 +133,9 @@ update msg model =
         SendHttpRequest ->
             ( model, getDatos )
 
-        DataReceived (Ok summaries) ->
+        DataReceived (Ok continents) ->
             ( { model
-                | summaries = summaries
+                | continents = continents
                 , errorMessage = Nothing
               }
             , Cmd.none
@@ -188,7 +170,7 @@ buildErrorMessage httpError =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { summaries = []
+    ( { continents = []
       , errorMessage = Nothing
       }
     , Cmd.none
