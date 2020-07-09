@@ -123,10 +123,9 @@ type Msg
     | DataReceived (Result Http.Error (List Summary))
 
 
-summaryDecoder : Decoder Summary
-summaryDecoder =
-    
-    Decode.succeed Summary
+summaryDecoder : Decode.Decoder (List Summary)
+summaryDecoder = 
+    Decode.field "Countries" (Decode.list (Decode.succeed Summary
         |> required "Country" string
         |> required "CountryCode" string
         |> required "Slug" string
@@ -135,16 +134,14 @@ summaryDecoder =
         |> required "NewDeaths" int
         |> required "TotalDeaths" int
         |> required "NewRecovered" int
-        |> required "TotalRecovered" int
-        
-
+        |> required "TotalRecovered" int))
     
 
 getDatos : Cmd Msg
 getDatos =
     Http.get
-        { url = "http://localhost:5019/Countries"
-        , expect = Http.expectJson DataReceived (list summaryDecoder)
+        { url = "https://api.covid19api.com/summary"
+        , expect = Http.expectJson DataReceived summaryDecoder
         }
 
 
