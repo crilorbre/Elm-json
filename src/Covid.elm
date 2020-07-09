@@ -2,7 +2,8 @@ module Covid exposing (main)
 
 import Browser
 import Html exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
+import Html.Attributes exposing (placeholder, value)
 import Http
 import Json.Decode as Decode exposing (int, list, string)
 import Json.Decode.Pipeline exposing (required)
@@ -18,9 +19,14 @@ type alias Continent =
     , deaths: Int
     }
 
+type alias Search =
+    {
+        continent: String
+    }
 
 type alias Model =
     { continents : List Continent
+    , search: Search
     , errorMessage : Maybe String
     }
 
@@ -31,7 +37,10 @@ view model =
     div []
         [ button [ onClick SendHttpRequest ]
             [ text "Get data from server" ]
-        , viewContinentOrError model  
+        , viewContinentOrError model
+        , input [ placeholder "", value model.search.continent, onInput Change ] [] 
+        , button [ onClick DoSearch ]
+            [ text "Buscar" ]
         ]
 
 
@@ -106,6 +115,9 @@ viewContinent continent =
 type Msg
     = SendHttpRequest
     | DataReceived (Result Http.Error (List Continent))
+    | Change String
+    | DoSearch
+    | SearchCompleted (Result Http.Error Continent)
 
 
 jsonDecoder : Decode.Decoder (List Continent)
@@ -117,6 +129,16 @@ jsonDecoder =
         |> required "active" int
         |> required "recovered" int
         |> required "deaths" int)
+
+jsonDecoder2 : Decode.Decoder Continent
+jsonDecoder2 = 
+    Decode.succeed Continent
+        |> required "continent" string
+        |> required "population" int
+        |> required "cases" int
+        |> required "active" int
+        |> required "recovered" int
+        |> required "deaths" int
     
 
 getDatos : Cmd Msg
@@ -125,7 +147,13 @@ getDatos =
         { url = "https://corona.lmao.ninja/v2/continents?yesterday=true&sort"
         , expect = Http.expectJson DataReceived jsonDecoder
         }
-    
+
+getDatosPorContinente: String -> Cmd Msg
+getDatosPorContinente continent= 
+    Http.get
+        { url = "https://corona.lmao.ninja/v2/continents/"++continent++"?yesterday&strict"
+        , expect = Http.expectJson SearchCompleted jsonDecoder2
+        }
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -147,7 +175,31 @@ update msg model =
               }
             , Cmd.none
             )
+        
+        Change continent ->
+            ({model|search = updateSearch continent}, Cmd.none)
 
+        DoSearch ->
+            ( model, getDatosPorContinente model.search.continent)
+
+        SearchCompleted (Ok continent) ->
+            ( { model
+                | continents = continent :: []
+                , errorMessage = Nothing
+              }
+            , Cmd.none
+            )
+
+        SearchCompleted (Err httpError) ->
+            ( { model
+                | errorMessage = Just (buildErrorMessage httpError)
+              }
+            , Cmd.none
+            )
+
+updateSearch: String -> Search
+updateSearch string =   
+    Search string
 
 buildErrorMessage : Http.Error -> String
 buildErrorMessage httpError =
@@ -171,6 +223,7 @@ buildErrorMessage httpError =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { continents = []
+      , search = Search ""
       , errorMessage = Nothing
       }
     , Cmd.none
