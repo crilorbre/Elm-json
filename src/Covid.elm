@@ -34,13 +34,13 @@ type alias Model =
 --VISTA
 view : Model -> Html Msg
 view model =
-    div []
-        [ button [ onClick SendHttpRequest ]
-            [ text "Get data from server" ]
-        , viewContinentOrError model
+    div [][
+        viewContinentOrError model
         , input [ placeholder "", value model.search.continent, onInput Change ] [] 
         , button [ onClick DoSearch ]
             [ text "Buscar" ]
+        , button [ onClick GoBack ]
+            [ text "Back" ]
         ]
 
 
@@ -58,7 +58,7 @@ viewError : String -> Html Msg
 viewError errorMessage =
     let
         errorHeading =
-            "Couldn't fetch data at this time."
+            "No se pudieron recuperar los datos en este momento."
     in
     div []
         [ h3 [] [ text errorHeading ]
@@ -69,7 +69,7 @@ viewError errorMessage =
 viewContinents : List Continent -> Html Msg
 viewContinents continents =
     div []
-        [ h3 [] [ text "Continents" ]
+        [ h2 [] [ text "Continentes" ]
         , table []
             ([ viewTableHeader ] ++ List.map viewContinent continents)
         ]
@@ -113,15 +113,19 @@ viewContinent continent =
 
 --ACTUALIZAR
 type Msg
-    = SendHttpRequest
-    | DataReceived (Result Http.Error (List Continent))
+    = DataReceived (Result Http.Error (List Continent))
     | Change String
     | DoSearch
     | SearchCompleted (Result Http.Error Continent)
+    | GoBack
 
 
-jsonDecoder : Decode.Decoder (List Continent)
-jsonDecoder = 
+{- 
+    Decodificador de JSON: Convierte la lista de objetos JSON
+    en la lista de Continent
+-}
+listContinentDecoder : Decode.Decoder (List Continent)
+listContinentDecoder = 
     Decode.list (Decode.succeed Continent
         |> required "continent" string
         |> required "population" int
@@ -130,8 +134,13 @@ jsonDecoder =
         |> required "recovered" int
         |> required "deaths" int)
 
-jsonDecoder2 : Decode.Decoder Continent
-jsonDecoder2 = 
+
+{- 
+    Decodificador de JSON: Convierte un único objeto JSON
+    en un Continent
+-}
+continentDecoder : Decode.Decoder Continent
+continentDecoder = 
     Decode.succeed Continent
         |> required "continent" string
         |> required "population" int
@@ -141,26 +150,38 @@ jsonDecoder2 =
         |> required "deaths" int
     
 
+{- 
+    Peticion GET para obtener los datos de 
+    todos los contienentes
+-}
 getDatos : Cmd Msg
 getDatos =
     Http.get
         { url = "https://corona.lmao.ninja/v2/continents?yesterday=true&sort"
-        , expect = Http.expectJson DataReceived jsonDecoder
+        , expect = Http.expectJson DataReceived listContinentDecoder
         }
 
+
+{- 
+    Peticion GET para obtener toda la información de
+    un continente especificado por parametro
+-}
 getDatosPorContinente: String -> Cmd Msg
 getDatosPorContinente continent= 
     Http.get
         { url = "https://corona.lmao.ninja/v2/continents/"++continent++"?yesterday&strict"
-        , expect = Http.expectJson SearchCompleted jsonDecoder2
+        , expect = Http.expectJson SearchCompleted continentDecoder
         }
+
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SendHttpRequest ->
-            ( model, getDatos )
-
+    
+        {- 
+            Si he recibido los datos correctamente, añado
+            la lista a mi lista de continentes del modelo
+        -}
         DataReceived (Ok continents) ->
             ( { model
                 | continents = continents
@@ -169,6 +190,12 @@ update msg model =
             , Cmd.none
             )
 
+
+        {- 
+            Si ha ocurrido algun error durante el proceso
+            añado el mensaje de error al campo errorMessage
+            del modelo
+        -}
         DataReceived (Err httpError) ->
             ( { model
                 | errorMessage = Just (buildErrorMessage httpError)
@@ -176,12 +203,40 @@ update msg model =
             , Cmd.none
             )
         
+
+        {- 
+            Si el input cambia de valor, model.search
+            es actualizado con ese nuevo valor
+        -}
         Change continent ->
             ({model|search = updateSearch continent}, Cmd.none)
 
-        DoSearch ->
-            ( model, getDatosPorContinente model.search.continent)
 
+        {- 
+            Al pulsar sobre el botón "Buscar", se realizara la llamada
+            al metodo al metodo donde obteniamos los datos por el continente
+            especificado en el input
+        -}
+        DoSearch ->
+            {-
+                Si el campo contienent del modelo Search no esta
+                vacio, obtenemos los datos del continente especificado
+            -}
+            if model.search.continent /= "" then
+                ( model, getDatosPorContinente model.search.continent)
+            
+            {-
+                Si el campo contienent del modelo Search esta
+                vacio, llamamos al metodo para obtener todos
+                los datos
+            -}
+            else
+                ( model, getDatos)
+
+        {- 
+            Si he recibido los datos correctamente, añado
+            el continentes obtenido a la lista vacia
+        -}
         SearchCompleted (Ok continent) ->
             ( { model
                 | continents = continent :: []
@@ -190,6 +245,12 @@ update msg model =
             , Cmd.none
             )
 
+
+        {- 
+            Si ha ocurrido algun error durante el proceso
+            añado el mensaje de error al campo errorMessage
+            del modelo
+        -}
         SearchCompleted (Err httpError) ->
             ( { model
                 | errorMessage = Just (buildErrorMessage httpError)
@@ -197,10 +258,37 @@ update msg model =
             , Cmd.none
             )
 
+
+        {- 
+            Utilizado para volver hacia atrás cuando
+            se haya realizado una busqueda
+        -}
+        GoBack ->
+            ( { continents = []
+            , search = Search ""
+            , errorMessage = Nothing
+            }
+            , getDatos
+            )
+
+
+-- METODOS AUXILIARES
+
+
+{- 
+    Metodo para actualizar el campo 
+    de Search con el valor "string"
+-}
 updateSearch: String -> Search
 updateSearch string =   
     Search string
 
+
+{- 
+    Metodo para obtener un mensaje de error
+    dependiento del tipo de error HTTP que
+    haya ocurrido
+-}
 buildErrorMessage : Http.Error -> String
 buildErrorMessage httpError =
     case httpError of
@@ -220,13 +308,20 @@ buildErrorMessage httpError =
             message
 
 
+-- INIT
+
+{-
+    Iniciamos la aplicacion inicializacion el modelo
+    y realizando una llamada al metodo "getDatos" para obtener
+    los datos del servidor
+-}
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { continents = []
       , search = Search ""
       , errorMessage = Nothing
       }
-    , Cmd.none
+    , getDatos
     )
 
 
