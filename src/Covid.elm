@@ -3,7 +3,7 @@ module Covid exposing (main)
 import Browser
 import Html exposing (..)
 import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (placeholder, value)
+import Html.Attributes exposing (placeholder, value, style)
 import Http
 import Json.Decode as Decode exposing (int, list, string)
 import Json.Decode.Pipeline exposing (required)
@@ -36,11 +36,12 @@ view : Model -> Html Msg
 view model =
     div [][
         viewContinentOrError model
+        , strong [][text "Buscar continente "]
         , input [ placeholder "", value model.search.continent, onInput Change ] [] 
         , button [ onClick DoSearch ]
             [ text "Buscar" ]
         , button [ onClick GoBack ]
-            [ text "Back" ]
+            [ text "Volver" ]
         ]
 
 
@@ -69,44 +70,44 @@ viewError errorMessage =
 viewContinents : List Continent -> Html Msg
 viewContinents continents =
     div []
-        [ h2 [] [ text "Continentes" ]
-        , table []
+        [ h2 [] [ text "COVID-19  Continentes" ]
+        , table [style "width" "100%", style "text-align" "center", style "border-collapse" "collapse", style "border" "1px solid black"]
             ([ viewTableHeader ] ++ List.map viewContinent continents)
         ]
 
 
 viewTableHeader : Html Msg
 viewTableHeader =
-    tr []
-        [ th []
+    tr [style "height" "70px"]
+        [ th [style "border" "1px solid black"]
             [ text "Continente" ]
-        , th []
+        , th [style "border" "1px solid black"]
             [ text "Población" ]
-        , th []
+        , th [style "border" "1px solid black"]
             [ text "Casos totales" ]
-        , th []
+        , th [style "border" "1px solid black"]
             [ text "Casos activos" ]
-        , th []
+        , th [style "border" "1px solid black"]
             [ text "Casos recuperados" ]
-        , th []
+        , th [style "border" "1px solid black"]
             [ text "Muertes" ]
         ]
 
 
 viewContinent : Continent -> Html Msg
 viewContinent continent =
-    tr []
-        [ td []
+    tr [style "height" "50px"]
+        [ td [style "border" "1px solid black"]
             [ text continent.name ]
-        , td []
+        , td [style "border" "1px solid black"]
             [ text (String.fromInt continent.population) ]
-        , td []
+        , td [style "border" "1px solid black"]
             [ text (String.fromInt continent.totalCases) ]
-        , td []
+        , td [style "border" "1px solid black"]
             [ text (String.fromInt continent.active) ]
-        , td []
+        , td [style "border" "1px solid black"]
             [ text (String.fromInt continent.recovered) ]
-        , td []
+        , td [style "border" "1px solid black"]
             [ text (String.fromInt continent.deaths) ]
         ]
 
@@ -271,10 +272,7 @@ update msg model =
             se haya realizado una busqueda
         -}
         GoBack ->
-            ( { continents = []
-            , search = Search ""
-            , errorMessage = Nothing
-            }
+            ( {model|search = updateSearch ""}
             , getDatos
             )
 
