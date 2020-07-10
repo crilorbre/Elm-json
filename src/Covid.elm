@@ -151,6 +151,9 @@ continentDecoder =
         |> required "deaths" int
     
 
+--HTTP
+
+
 {- 
     Peticion GET para obtener los datos de 
     todos los contienentes
