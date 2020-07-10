@@ -167,11 +167,18 @@ getDatos =
     un continente especificado por parametro
 -}
 getDatosPorContinente: String -> Cmd Msg
-getDatosPorContinente continent= 
-    Http.get
-        { url = "https://corona.lmao.ninja/v2/continents/"++continent++"?yesterday&strict"
-        , expect = Http.expectJson SearchCompleted continentDecoder
-        }
+getDatosPorContinente continent = 
+
+    if String.toLower continent == "australia" || String.toLower continent == "oceania" || String.toLower continent == "australia/oceania" then
+        Http.get
+            { url = "https://corona.lmao.ninja/v2/continents/"++"Australia%2Foceania"++"?yesterday&strict"
+            , expect = Http.expectJson SearchCompleted continentDecoder
+            }
+    else
+        Http.get
+                { url = "https://corona.lmao.ninja/v2/continents/"++continent++"?yesterday&strict"
+                , expect = Http.expectJson SearchCompleted continentDecoder
+                }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
