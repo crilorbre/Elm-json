@@ -5,30 +5,36 @@ import Html exposing (..)
 import Html.Events exposing (onClick, onInput)
 import Html.Attributes exposing (placeholder, value, style, disabled, selected)
 import Http
-import Json.Decode as Decode exposing (int, list, string)
-import Json.Decode.Pipeline exposing (required)
+import Json.Decode as Decode exposing (list, string)
+import Json.Decode.Pipeline exposing (optional)
 
 import Paginate exposing (..)
 
 
 --MODELO
-type alias Continent =
-    { name : String
-    , population : Int
-    , totalCases: Int
-    , active: Int
-    , recovered: Int
-    , deaths: Int
+type alias Country =
+    { nameCountry : String
+    , lastUpdate : String
+    , totalCases: String
+    , activeCases: String
+    , recoveredCases: String
+    , deaths: String
     }
 
 type alias Search =
     {
-        continent: String
+        nameCountry: String
+    }
+
+type alias Pagination = 
+    {
+        pageSize: Int
     }
 
 type alias Model =
-    { continents : PaginatedList Continent
+    { countries : PaginatedList Country
     , search: Search
+    , pagination: Pagination
     , errorMessage : Maybe String
     }
 
@@ -37,9 +43,9 @@ type alias Model =
 view : Model -> Html Msg
 view model =
     div [][
-        viewContinentOrError model
-        , strong [][text "Buscar continente "]
-        , input [ placeholder "", value model.search.continent, onInput Change ] [] 
+        viewCountriesTableOrError model
+        , strong [][text "Search country "]
+        , input [ placeholder "", value model.search.nameCountry, onInput Change ] [] 
         , button [ onClick DoSearch ]
             [ text "Buscar" ]
         , button [ onClick GoBack ]
@@ -47,14 +53,14 @@ view model =
         ]
 
 
-viewContinentOrError : Model -> Html Msg
-viewContinentOrError model =
+viewCountriesTableOrError : Model -> Html Msg
+viewCountriesTableOrError model =
     case model.errorMessage of
         Just message ->
             viewError message
 
         Nothing ->
-            viewContinents model.continents
+            viewCountriesTable model.countries
 
 
 viewError : String -> Html Msg
@@ -69,109 +75,132 @@ viewError errorMessage =
         ]
 
 
-viewContinents : PaginatedList Continent -> Html Msg
-viewContinents continents =
+viewCountriesTable : PaginatedList Country -> Html Msg
+viewCountriesTable countries =
     div []
-        [ h2 [] [ text "COVID-19  Continentes" ]
+        [ h2 [] [ text "COVID-19  Countries" ]
         ,
             div []
-                [ text "Mostrar "
+                [ text "Show "
                 , select [ onInput ChangePageSize ]
-                    [ option [ value "1" ] [ text "1" ]
-                    , option [ value "2" ] [ text "2" ]
-                    , option [ value "3", selected True ] [ text "3" ]
+                    [ option [ value "3" ] [ text "3" ]
+                    , option [ value "5", selected True ] [ text "5" ]
+                    , option [ value "10" ] [ text "10" ]
                     ]
-                , text " continentes por página"
+                , text " countries per page"
                 ]
         , table [style "width" "100%", style "text-align" "center", style "border-collapse" "collapse", style "border" "1px solid black"]
-            ([ viewTableHeader ] ++ List.map viewContinent (Paginate.page (continents)))
+            ([ viewTableHeader ] ++ List.map viewCountry (Paginate.page (countries)))
         ,
             div[][
-            button [ onClick First, disabled <| Paginate.isFirst continents ] [ text "<<" ]
-            , button [ onClick Prev, disabled <| Paginate.isFirst continents ] [ text "<" ]
-            , button [ onClick Next, disabled <| Paginate.isLast continents ] [ text ">" ]
-            , button [ onClick Last, disabled <| Paginate.isLast continents ] [ text ">>" ]
+            button [ onClick First, disabled <| Paginate.isFirst countries ] [ text "<<" ]
+            , button [ onClick Prev, disabled <| Paginate.isFirst countries ] [ text "<" ]
+            , span [] <| Paginate.elidedPager pagerOptions countries
+            , button [ onClick Next, disabled <| Paginate.isLast countries ] [ text ">" ]
+            , button [ onClick Last, disabled <| Paginate.isLast countries ] [ text ">>" ]
             ]
         ]
 
+-- METODOS AUXILIARES PAGINACION
+pagerOptions =
+            { innerWindow = 1
+            , outerWindow = 1
+            , pageNumberView = pagerButtonView
+            , gapView = text "..."
+            }
+
+pagerButtonView: Int-> Bool -> Html Msg
+pagerButtonView index isActive =
+            button
+                [ style "font-weight"
+                    (if isActive then
+                        "bold"
+
+                     else
+                        "normal"
+                    )
+                , onClick <| GoTo index
+                ]
+                [ text <| String.fromInt index ]
 
 viewTableHeader : Html Msg
 viewTableHeader =
     tr [style "height" "70px"]
         [ th [style "border" "1px solid black"]
-            [ text "Continente" ]
+            [ text "Country" ]
         , th [style "border" "1px solid black"]
-            [ text "Población" ]
+            [ text "Last update" ]
         , th [style "border" "1px solid black"]
-            [ text "Casos totales" ]
+            [ text "Total cases" ]
         , th [style "border" "1px solid black"]
-            [ text "Casos activos" ]
+            [ text "Actives cases" ]
         , th [style "border" "1px solid black"]
-            [ text "Casos recuperados" ]
+            [ text "Recovered cases" ]
         , th [style "border" "1px solid black"]
-            [ text "Muertes" ]
+            [ text "Deaths" ]
         ]
 
-viewContinent : Continent -> Html Msg
-viewContinent continent =
+viewCountry : Country -> Html Msg
+viewCountry country =
     tr [style "height" "50px"]
         [ td [style "border" "1px solid black"]
-            [ text continent.name ]
+            [ text country.nameCountry ]
         , td [style "border" "1px solid black"]
-            [ text (String.fromInt continent.population) ]
+            [ text country.lastUpdate ]
         , td [style "border" "1px solid black"]
-            [ text (String.fromInt continent.totalCases) ]
+            [ text country.totalCases ]
         , td [style "border" "1px solid black"]
-            [ text (String.fromInt continent.active) ]
+            [ text country.activeCases ]
         , td [style "border" "1px solid black"]
-            [ text (String.fromInt continent.recovered) ]
+            [ text country.recoveredCases ]
         , td [style "border" "1px solid black"]
-            [ text (String.fromInt continent.deaths) ]
+            [ text country.deaths ]
         ]
 
 
 --ACTUALIZAR
 type Msg
-    = DataReceived (Result Http.Error (List Continent))
+    = DataReceived (Result Http.Error (List Country))
     | Change String
     | DoSearch
-    | SearchCompleted (Result Http.Error Continent)
+    | SearchCompleted (Result Http.Error Country)
     | GoBack
     | Next
     | Prev
     | First
     | Last
+    | GoTo Int
     | ChangePageSize String
 
 
 {- 
     Decodificador de JSON: Convierte la lista de objetos JSON
-    en la lista de Continent
+    en la lista de Countries
 -}
-listContinentDecoder : Decode.Decoder (List Continent)
-listContinentDecoder = 
-    Decode.list (Decode.succeed Continent
-        |> required "continent" string
-        |> required "population" int
-        |> required "cases" int
-        |> required "active" int
-        |> required "recovered" int
-        |> required "deaths" int)
+listCountryDecoder : Decode.Decoder (List Country)
+listCountryDecoder = 
+    Decode.list (Decode.succeed Country 
+        |> optional "Country_text" string "N/A"
+        |> optional "Last Update" string "N/A"
+        |> optional "Total Cases_text" string "N/A"
+        |> optional "Active Cases_text" string "N/A"
+        |> optional "Total Recovered_text" string "N/A"
+        |> optional "Total Deaths_text" string "N/A")
 
 
 {- 
     Decodificador de JSON: Convierte un único objeto JSON
-    en un Continent
+    en un objeto "Country"
 -}
-continentDecoder : Decode.Decoder Continent
-continentDecoder = 
-    Decode.succeed Continent
-        |> required "continent" string
-        |> required "population" int
-        |> required "cases" int
-        |> required "active" int
-        |> required "recovered" int
-        |> required "deaths" int
+countryDecoder : Decode.Decoder Country
+countryDecoder = 
+    Decode.succeed Country
+        |> optional "Country_text" string "N/A"
+        |> optional "Last Update" string "N/A"
+        |> optional "Total Cases_text" string "N/A"
+        |> optional "Active Cases_text" string "N/A"
+        |> optional "Total Recovered_text" string "N/A"
+        |> optional "Total Deaths_text" string "N/A"
     
 
 --HTTP
@@ -179,13 +208,13 @@ continentDecoder =
 
 {- 
     Peticion GET para obtener los datos de 
-    todos los contienentes
+    todos los paises
 -}
-getDatos : Cmd Msg
-getDatos =
+getDatas : Cmd Msg
+getDatas =
     Http.get
-        { url = "https://corona.lmao.ninja/v2/continents?yesterday=true&sort"
-        , expect = Http.expectJson DataReceived listContinentDecoder
+        { url = "https://covid-19.dataflowkit.com/v1"
+        , expect = Http.expectJson DataReceived listCountryDecoder
         }
 
 
@@ -193,18 +222,11 @@ getDatos =
     Peticion GET para obtener toda la información de
     un continente especificado por parametro
 -}
-getDatosPorContinente: String -> Cmd Msg
-getDatosPorContinente continent = 
-
-    if String.toLower continent == "australia" || String.toLower continent == "oceania" || String.toLower continent == "australia/oceania" then
+getDatasByCountry: String -> Cmd Msg
+getDatasByCountry country = 
         Http.get
-            { url = "https://corona.lmao.ninja/v2/continents/"++"Australia%2Foceania"++"?yesterday&strict"
-            , expect = Http.expectJson SearchCompleted continentDecoder
-            }
-    else
-        Http.get
-                { url = "https://corona.lmao.ninja/v2/continents/"++continent++"?yesterday&strict"
-                , expect = Http.expectJson SearchCompleted continentDecoder
+                { url = "https://covid-19.dataflowkit.com/v1/"++country
+                , expect = Http.expectJson SearchCompleted countryDecoder
                 }
 
 
@@ -213,12 +235,12 @@ update msg model =
     case msg of
     
         {- 
-            Si he recibido los datos correctamente, añado
-            la lista a mi lista de continentes del modelo
+            Si la peticion se ha realizado correctamente, añado
+            la lista a mi lista de paises del modelo
         -}
-        DataReceived (Ok continents) ->
+        DataReceived (Ok countries) ->
             ( { model
-                | continents = fromList 3 continents
+                | countries = fromList model.pagination.pageSize countries
                 , errorMessage = Nothing
               }
             , Cmd.none
@@ -242,38 +264,38 @@ update msg model =
             Si el input cambia de valor, model.search
             es actualizado con ese nuevo valor
         -}
-        Change continent ->
-            ({model|search = updateSearch continent}, Cmd.none)
+        Change country ->
+            ({model|search = updateSearch country}, Cmd.none)
 
 
         {- 
             Al pulsar sobre el botón "Buscar", se realizara la llamada
-            al metodo al metodo donde obteniamos los datos por el continente
+            al metodo al metodo donde obteniamos los datos por el pais
             especificado en el input
         -}
         DoSearch ->
             {-
-                Si el atributo "continent" del modelo Search no esta
-                vacio, obtenemos los datos del continente especificado
+                Si el atributo "nameCountry" del modelo Search no esta
+                vacio, obtenemos los datos del pais especificado
             -}
-            if model.search.continent /= "" then
-                ( model, getDatosPorContinente model.search.continent)
+            if model.search.nameCountry /= "" then
+                ( model, getDatasByCountry model.search.nameCountry)
             
             {-
-                Si el campo contienent del modelo Search esta
+                Si el campo "nameCountry" del modelo Search esta
                 vacio, llamamos al metodo para obtener todos
                 los datos
             -}
             else
-                ( model, getDatos)
+                ( model, getDatas)
 
         {- 
             Si he recibido los datos correctamente, añado
-            el continentes obtenido a la lista vacia
+            el pais obtenido a la lista vacia
         -}
-        SearchCompleted (Ok continent) ->
+        SearchCompleted (Ok country) ->
             ( { model
-                | continents = fromList 1 (continent::[])
+                | countries = fromList 1 (country::[])
                 , errorMessage = Nothing
               }
             , Cmd.none
@@ -299,45 +321,50 @@ update msg model =
         -}
         GoBack ->
             ( {model|search = updateSearch ""}
-            , getDatos
+            , getDatas
             )
 
+        {- 
+            Paginacion: Ir al numero de pagina seleccionado
+        -}
+        GoTo index ->
+            ({ model | countries = Paginate.goTo index model.countries }, Cmd.none)
 
         {- 
             Paginacion: Ir a la siguiente pagina
         -}
         Next ->
-            ({ model | continents = Paginate.next model.continents }, Cmd.none)
+            ({ model | countries = Paginate.next model.countries }, Cmd.none)
 
 
         {- 
             Paginacion: Ir a la pagina anterior
         -}
         Prev ->
-            ({ model | continents = Paginate.prev model.continents }, Cmd.none)
+            ({ model | countries = Paginate.prev model.countries }, Cmd.none)
 
         {- 
             Paginacion: Ir a la primera pagina
         -}
         First ->
-            ({ model | continents = Paginate.first model.continents }, Cmd.none)
+            ({ model | countries = Paginate.first model.countries }, Cmd.none)
 
         {- 
             Paginacion: Ir a la ultima pagina
         -}
         Last ->
-            ({ model | continents = Paginate.last model.continents }, Cmd.none)
+            ({ model | countries = Paginate.last model.countries }, Cmd.none)
 
         {- 
             Paginacion: Cambiar el numero de
-            continentes que se muestran en la lista
+            paises que se muestran en la lista
         -}
         ChangePageSize size ->
             let
                 sizeAsInt =
                     Maybe.withDefault 10 <| String.toInt size
             in
-            ({ model | continents = Paginate.changeItemsPerPage sizeAsInt model.continents }, Cmd.none)
+            ({ model | countries = Paginate.changeItemsPerPage sizeAsInt model.countries , pagination = updatePagination sizeAsInt }, Cmd.none)
 
 
 -- METODOS AUXILIARES
@@ -350,6 +377,10 @@ update msg model =
 updateSearch: String -> Search
 updateSearch string =   
     Search string
+
+updatePagination: Int -> Pagination
+updatePagination size =   
+    Pagination size
 
 
 {- 
@@ -386,11 +417,12 @@ buildErrorMessage httpError =
 -}
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { continents = fromList 0 []
+    ( { countries = fromList 0 []
       , search = Search ""
+      , pagination = Pagination 5
       , errorMessage = Nothing
       }
-    , getDatos
+    , getDatas
     )
 
 
