@@ -3,10 +3,12 @@ module Covid exposing (main)
 import Browser
 import Html exposing (..)
 import Html.Events exposing (onClick, onInput)
-import Html.Attributes exposing (placeholder, value, style)
+import Html.Attributes exposing (placeholder, value, style, disabled, selected)
 import Http
 import Json.Decode as Decode exposing (int, list, string)
 import Json.Decode.Pipeline exposing (required)
+
+import Paginate exposing (..)
 
 
 --MODELO
@@ -25,7 +27,7 @@ type alias Search =
     }
 
 type alias Model =
-    { continents : List Continent
+    { continents : PaginatedList Continent
     , search: Search
     , errorMessage : Maybe String
     }
@@ -67,12 +69,29 @@ viewError errorMessage =
         ]
 
 
-viewContinents : List Continent -> Html Msg
+viewContinents : PaginatedList Continent -> Html Msg
 viewContinents continents =
     div []
         [ h2 [] [ text "COVID-19  Continentes" ]
+        ,
+            div []
+                [ text "Mostrar "
+                , select [ onInput ChangePageSize ]
+                    [ option [ value "1" ] [ text "1" ]
+                    , option [ value "2" ] [ text "2" ]
+                    , option [ value "3", selected True ] [ text "3" ]
+                    ]
+                , text " continentes por página"
+                ]
         , table [style "width" "100%", style "text-align" "center", style "border-collapse" "collapse", style "border" "1px solid black"]
-            ([ viewTableHeader ] ++ List.map viewContinent continents)
+            ([ viewTableHeader ] ++ List.map viewContinent (Paginate.page (continents)))
+        ,
+            div[][
+            button [ onClick First, disabled <| Paginate.isFirst continents ] [ text "<<" ]
+            , button [ onClick Prev, disabled <| Paginate.isFirst continents ] [ text "<" ]
+            , button [ onClick Next, disabled <| Paginate.isLast continents ] [ text ">" ]
+            , button [ onClick Last, disabled <| Paginate.isLast continents ] [ text ">>" ]
+            ]
         ]
 
 
@@ -92,7 +111,6 @@ viewTableHeader =
         , th [style "border" "1px solid black"]
             [ text "Muertes" ]
         ]
-
 
 viewContinent : Continent -> Html Msg
 viewContinent continent =
@@ -119,6 +137,11 @@ type Msg
     | DoSearch
     | SearchCompleted (Result Http.Error Continent)
     | GoBack
+    | Next
+    | Prev
+    | First
+    | Last
+    | ChangePageSize String
 
 
 {- 
@@ -195,7 +218,7 @@ update msg model =
         -}
         DataReceived (Ok continents) ->
             ( { model
-                | continents = continents
+                | continents = fromList 3 continents
                 , errorMessage = Nothing
               }
             , Cmd.none
@@ -230,7 +253,7 @@ update msg model =
         -}
         DoSearch ->
             {-
-                Si el campo contienent del modelo Search no esta
+                Si el atributo "continent" del modelo Search no esta
                 vacio, obtenemos los datos del continente especificado
             -}
             if model.search.continent /= "" then
@@ -250,7 +273,7 @@ update msg model =
         -}
         SearchCompleted (Ok continent) ->
             ( { model
-                | continents = continent :: []
+                | continents = fromList 1 (continent::[])
                 , errorMessage = Nothing
               }
             , Cmd.none
@@ -278,6 +301,43 @@ update msg model =
             ( {model|search = updateSearch ""}
             , getDatos
             )
+
+
+        {- 
+            Paginacion: Ir a la siguiente pagina
+        -}
+        Next ->
+            ({ model | continents = Paginate.next model.continents }, Cmd.none)
+
+
+        {- 
+            Paginacion: Ir a la pagina anterior
+        -}
+        Prev ->
+            ({ model | continents = Paginate.prev model.continents }, Cmd.none)
+
+        {- 
+            Paginacion: Ir a la primera pagina
+        -}
+        First ->
+            ({ model | continents = Paginate.first model.continents }, Cmd.none)
+
+        {- 
+            Paginacion: Ir a la ultima pagina
+        -}
+        Last ->
+            ({ model | continents = Paginate.last model.continents }, Cmd.none)
+
+        {- 
+            Paginacion: Cambiar el numero de
+            continentes que se muestran en la lista
+        -}
+        ChangePageSize size ->
+            let
+                sizeAsInt =
+                    Maybe.withDefault 10 <| String.toInt size
+            in
+            ({ model | continents = Paginate.changeItemsPerPage sizeAsInt model.continents }, Cmd.none)
 
 
 -- METODOS AUXILIARES
@@ -316,6 +376,7 @@ buildErrorMessage httpError =
             message
 
 
+
 -- INIT
 
 {-
@@ -325,7 +386,7 @@ buildErrorMessage httpError =
 -}
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { continents = []
+    ( { continents = fromList 0 []
       , search = Search ""
       , errorMessage = Nothing
       }
