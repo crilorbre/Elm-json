@@ -44,12 +44,6 @@ view : Model -> Html Msg
 view model =
     div [][
         viewCountriesTableOrError model
-        , strong [][text "Search country "]
-        , input [ placeholder "", value model.search.nameCountry, onInput Change ] [] 
-        , button [ onClick DoSearch ]
-            [ text "Buscar" ]
-        , button [ onClick GoBack ]
-            [ text "Volver" ]
         ]
 
 
@@ -60,27 +54,39 @@ viewCountriesTableOrError model =
             viewError message
 
         Nothing ->
-            viewCountriesTable model.countries
+            viewCountriesTable model
 
 
 viewError : String -> Html Msg
 viewError errorMessage =
     let
         errorHeading =
-            "No se pudieron recuperar los datos en este momento."
+            "Data could not be recovered at this time."
     in
     div []
         [ h3 [] [ text errorHeading ]
         , text ("Error: " ++ errorMessage)
+        , button [ onClick GoBack ]
+                    [ text "Try again" ]
         ]
 
 
-viewCountriesTable : PaginatedList Country -> Html Msg
-viewCountriesTable countries =
+viewCountriesTable : Model -> Html Msg
+viewCountriesTable model =
     div []
-        [ h2 [] [ text "COVID-19  Countries" ]
+        [ h2 [style "margin" "50px"] [ text "Summary: COVID-19 Countries" ]
+        ,div [style "margin" "150px auto", style "width" "1000px"][
+            div[style "margin" "10px"][
+                strong [][text "Search country "]
+                , input [ placeholder "Country...", value model.search.nameCountry, onInput Change ] [] 
+                , button [style "margin" "5px", onClick DoSearch ]
+                    [ text "Search" ]
+                , button [ onClick GoBack ]
+                    [ text "Back" ]
+            ]
+
         ,
-            div []
+            div [style "margin" "10px"]
                 [ text "Show "
                 , select [ onInput ChangePageSize ]
                     [ option [ value "3" ] [ text "3" ]
@@ -89,19 +95,23 @@ viewCountriesTable countries =
                     ]
                 , text " countries per page"
                 ]
-        , table [style "width" "100%", style "text-align" "center", style "border-collapse" "collapse", style "border" "1px solid black"]
-            ([ viewTableHeader ] ++ List.map viewCountry (Paginate.page (countries)))
-        ,
-            div[][
-            button [ onClick First, disabled <| Paginate.isFirst countries ] [ text "<<" ]
-            , button [ onClick Prev, disabled <| Paginate.isFirst countries ] [ text "<" ]
-            , span [] <| Paginate.elidedPager pagerOptions countries
-            , button [ onClick Next, disabled <| Paginate.isLast countries ] [ text ">" ]
-            , button [ onClick Last, disabled <| Paginate.isLast countries ] [ text ">>" ]
+
+            , table [style "width" "100%", style "text-align" "center", style "border-collapse" "collapse", style "border" "1px solid black"]
+            ([ viewTableHeader ] ++ List.map viewCountry (Paginate.page (model.countries)))
+        
+            
+            , div[style "text-align" "center", style "margin" "10px"][
+            button [ onClick First, disabled <| Paginate.isFirst model.countries ] [ text "<<" ]
+            , button [ onClick Prev, disabled <| Paginate.isFirst model.countries ] [ text "<" ]
+            , span [] <| Paginate.elidedPager pagerOptions model.countries
+            , button [ onClick Next, disabled <| Paginate.isLast model.countries ] [ text ">" ]
+            , button [ onClick Last, disabled <| Paginate.isLast model.countries ] [ text ">>" ]
             ]
+        ]
         ]
 
 -- METODOS AUXILIARES PAGINACION
+
 pagerOptions =
             { innerWindow = 1
             , outerWindow = 1
@@ -125,35 +135,35 @@ pagerButtonView index isActive =
 
 viewTableHeader : Html Msg
 viewTableHeader =
-    tr [style "height" "70px"]
-        [ th [style "border" "1px solid black"]
+    tr [style "height" "70px", style "font-size" "20px", style "background" "darkorange", style "color" "white"]
+        [ th []
             [ text "Country" ]
-        , th [style "border" "1px solid black"]
+        , th []
             [ text "Last update" ]
-        , th [style "border" "1px solid black"]
+        , th []
             [ text "Total cases" ]
-        , th [style "border" "1px solid black"]
+        , th []
             [ text "Actives cases" ]
-        , th [style "border" "1px solid black"]
+        , th []
             [ text "Recovered cases" ]
-        , th [style "border" "1px solid black"]
+        , th []
             [ text "Deaths" ]
         ]
 
 viewCountry : Country -> Html Msg
 viewCountry country =
     tr [style "height" "50px"]
-        [ td [style "border" "1px solid black"]
+        [ td []
             [ text country.nameCountry ]
-        , td [style "border" "1px solid black"]
+        , td []
             [ text country.lastUpdate ]
-        , td [style "border" "1px solid black"]
+        , td []
             [ text country.totalCases ]
-        , td [style "border" "1px solid black"]
+        , td []
             [ text country.activeCases ]
-        , td [style "border" "1px solid black"]
+        , td []
             [ text country.recoveredCases ]
-        , td [style "border" "1px solid black"]
+        , td []
             [ text country.deaths ]
         ]
 
@@ -357,7 +367,8 @@ update msg model =
 
         {- 
             Paginacion: Cambiar el numero de
-            paises que se muestran en la lista
+            paises que se muestran en la lista y actualiza
+            el campo "pageSize" del modelo "Pagination"
         -}
         ChangePageSize size ->
             let
